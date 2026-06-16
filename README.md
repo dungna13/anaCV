@@ -95,8 +95,8 @@ Chạy lệnh khởi động giao diện CLI và tương tác từng bước:
 ```bash
 python main.py
 ```
-*   **Bước 1:** Nhập đường dẫn file CV (ví dụ: `data\sample_cvs\cv_nguyen_van_minh.txt`).
-*   **Bước 2:** Dán nội dung JD mục tiêu (nhấn Enter 2 lần để kết thúc nhận JD).
+*   **Bước 1:** Kéo thả trực tiếp file CV (PDF/TXT) hoặc nhập đường dẫn file CV (ví dụ: `data\sample_cvs\cv_nguyen_van_minh.txt`) vào terminal và nhấn Enter.
+*   **Bước 2:** Nhập đường dẫn file JD (PDF/TXT) bằng cách kéo thả file JD vào terminal, hoặc bạn có thể dán trực tiếp nội dung văn bản JD (nhấn Enter 2 lần để kết thúc nhận văn bản).
 *   **Bước 3:** AI sẽ tự động phân tích CV, phân loại lĩnh vực, xếp hạng level và sinh bộ câu hỏi.
 *   **Bước 4:** Trả lời trực tiếp từng câu hỏi hiển thị trên console. Hệ thống tự chấm điểm và đưa ra nhận xét động.
 *   **Bước 5:** Nhận tổng kết quyết định tuyển dụng (PASS/CONSIDER/FAIL) và báo cáo tối ưu hóa CV.
