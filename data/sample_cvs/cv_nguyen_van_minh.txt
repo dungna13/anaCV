@@ -1,0 +1,69 @@
+Nguyễn Văn Minh
+Email: nguyenvanminh.dev@gmail.com
+Điện thoại: 0901234567
+GitHub: github.com/minhdev
+
+═══════════════════════════════════════
+MỤC TIÊU NGHỀ NGHIỆP
+═══════════════════════════════════════
+Lập trình viên Backend với đam mê xây dựng các hệ thống phân tán, muốn tìm
+môi trường phát triển chuyên nghiệp để nâng cao kỹ năng trong lĩnh vực
+Cloud Computing và DevOps.
+
+═══════════════════════════════════════
+HỌC VẤN
+═══════════════════════════════════════
+Đại học Bách Khoa TP.HCM (2018 - 2022)
+Kỹ sư Công nghệ Thông tin
+GPA: 3.2/4.0
+
+═══════════════════════════════════════
+KINH NGHIỆM LÀM VIỆC
+═══════════════════════════════════════
+
+Backend Developer — Công ty TNHH ABC Tech (06/2022 - 12/2023)
+- Phát triển RESTful API bằng Python/FastAPI phục vụ 50K users/ngày
+- Thiết kế và tối ưu schema PostgreSQL, giảm query time 40%
+- Triển khai CI/CD pipeline với GitHub Actions + Docker
+- Tham gia code review và mentoring 1 intern
+- Tech stack: Python, FastAPI, PostgreSQL, Redis, Docker, GitHub Actions
+
+Junior Developer — Công ty Cổ phần XYZ Solutions (01/2022 - 05/2022)
+- Phát triển module thanh toán cho ứng dụng e-commerce
+- Viết unit test đạt coverage 80%
+- Fix bugs và optimize performance cho legacy codebase
+- Tech stack: Python, Django, MySQL, Git
+
+═══════════════════════════════════════
+DỰ ÁN CÁ NHÂN
+═══════════════════════════════════════
+
+Task Manager API (2023)
+- Xây dựng REST API quản lý công việc với authentication JWT
+- Tech: FastAPI, SQLAlchemy, PostgreSQL, Docker
+- Role: Full-stack (Backend heavy)
+
+Chat Bot Telegram (2022)
+- Bot hỗ trợ quản lý chi tiêu cá nhân
+- Tech: Python, python-telegram-bot, SQLite
+- Role: Solo developer
+
+═══════════════════════════════════════
+KỸ NĂNG
+═══════════════════════════════════════
+Ngôn ngữ: Python (thành thạo), JavaScript (cơ bản), SQL (tốt)
+Framework: FastAPI, Django, Flask
+Database: PostgreSQL, MySQL, Redis, SQLite
+DevOps: Docker, GitHub Actions, Linux (Ubuntu)
+Khác: Git, RESTful API Design, Agile/Scrum
+
+═══════════════════════════════════════
+CHỨNG CHỈ
+═══════════════════════════════════════
+- AWS Cloud Practitioner (2023)
+- TOEIC 750
+
+═══════════════════════════════════════
+NGOẠI NGỮ
+═══════════════════════════════════════
+- Tiếng Anh: TOEIC 750 (đọc hiểu tài liệu kỹ thuật tốt)

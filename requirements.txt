@@ -1,0 +1,39 @@
+# ──────────────────────────────────────────────────────────
+# CVHR — AI Agent Sơ vấn & Tối ưu CV Ứng viên
+# ──────────────────────────────────────────────────────────
+
+# Core Framework
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.5.3
+pydantic-settings>=2.1.0
+python-dotenv>=1.0.0
+
+# LLM & AI
+langchain>=0.2.0
+langchain-core>=0.2.0
+langchain-community>=0.2.0
+langchain-google-genai>=1.0.0
+langgraph>=0.0.20
+google-generativeai>=0.3.2
+
+# Document Processing (PDF parsing & generation)
+pypdf>=3.17.4
+pdfplumber>=0.10.0
+reportlab>=4.1.0
+
+# Async Support
+httpx>=0.26.0
+aiohttp>=3.9.1
+
+# Utilities
+python-multipart>=0.0.6
+structlog>=24.1.0
+pyyaml>=6.0.1
+
+# Tracing & Observability
+langfuse>=2.0.0
+
+# Testing
+pytest>=7.4.4
+pytest-asyncio>=0.23.3

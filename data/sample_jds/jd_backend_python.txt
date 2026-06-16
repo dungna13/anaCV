@@ -1,0 +1,42 @@
+═══════════════════════════════════════════════════════
+TUYỂN DỤNG: BACKEND DEVELOPER (PYTHON)
+Công ty: TechVN Solutions
+Địa điểm: TP. Hồ Chí Minh
+Hình thức: Full-time
+Mức lương: 15-25 triệu VNĐ (theo năng lực)
+═══════════════════════════════════════════════════════
+
+MÔ TẢ CÔNG VIỆC:
+- Phát triển và bảo trì các microservices backend bằng Python
+- Thiết kế RESTful API và GraphQL endpoints
+- Làm việc với cơ sở dữ liệu PostgreSQL và Redis
+- Triển khai và quản lý ứng dụng trên AWS (EC2, S3, RDS, Lambda)
+- Tham gia thiết kế kiến trúc hệ thống cho các dự án mới
+- Code review và mentoring junior developers
+- Viết unit test và integration test, đảm bảo code quality
+
+YÊU CẦU BẮT BUỘC (Must-have):
+- Tối thiểu 1-3 năm kinh nghiệm Backend Development
+- Thành thạo Python (FastAPI hoặc Django)
+- Kinh nghiệm với PostgreSQL và Redis
+- Hiểu biết về RESTful API design patterns
+- Kinh nghiệm với Docker và CI/CD
+- Sử dụng Git thành thạo
+- Tiếng Anh đọc hiểu tài liệu kỹ thuật
+
+YÊU CẦU ƯU TIÊN (Nice-to-have):
+- Kinh nghiệm với Kubernetes và container orchestration
+- Kinh nghiệm với AWS services (EC2, S3, RDS, Lambda, ECS)
+- Hiểu biết về message queue (RabbitMQ, Kafka)
+- Kinh nghiệm với GraphQL
+- Kinh nghiệm với microservices architecture
+- Chứng chỉ AWS (SAA, Developer Associate)
+- Đóng góp open-source
+
+QUYỀN LỢI:
+- Lương tháng 13, thưởng KPI
+- Bảo hiểm sức khỏe premium
+- Laptop công ty (MacBook Pro)
+- Đào tạo và hỗ trợ thi chứng chỉ AWS
+- Flexible working hours
+- Team building hàng quý
