@@ -132,28 +132,48 @@ def run_terminal() -> None:
 
     # ── Bước 2: Nhập JD ──
     print("📋 Nhập Job Description (JD):")
-    print("   (Paste nội dung JD, nhấn Enter 2 lần để kết thúc)")
-    print("-" * 40)
+    print("   (Bạn có thể dán trực tiếp nội dung JD, hoặc kéo thả/nhập đường dẫn file PDF/TXT và nhấn Enter)")
+    print("-" * 75)
 
-    jd_lines = []
-    empty_count = 0
-    while True:
-        line = input()
-        if line.strip() == "":
-            empty_count += 1
-            if empty_count >= 2:
-                break
-            jd_lines.append("")
-        else:
-            empty_count = 0
-            jd_lines.append(line)
+    first_line = input().strip().strip('"')
+    jd_text = ""
 
-    jd_text = "\n".join(jd_lines).strip()
+    # Kiểm tra xem dòng đầu tiên có phải là đường dẫn file hợp lệ không
+    if first_line and (first_line.lower().endswith(".pdf") or first_line.lower().endswith(".txt") or first_line.lower().endswith(".md")):
+        try:
+            from pathlib import Path
+            file_path = Path(first_line)
+            if file_path.exists():
+                if first_line.lower().endswith(".pdf"):
+                    jd_text = parse_pdf(first_line)
+                else:
+                    jd_text = parse_text_file(first_line)
+                _print_success(f"✅ Đã đọc JD từ file: {first_line} ({len(jd_text)} ký tự)\n")
+        except Exception as e:
+            _print_warning(f"⚠️ Có lỗi khi đọc file JD: {e}. Coi đầu vào là văn bản gốc...")
+
+    # Nếu không tìm thấy file hoặc lỗi, coi như nhận paste text trực tiếp
+    if not jd_text:
+        jd_lines = [first_line] if first_line else []
+        empty_count = 0
+        while True:
+            line = input()
+            if line.strip() == "":
+                empty_count += 1
+                if empty_count >= 2:
+                    break
+                jd_lines.append("")
+            else:
+                empty_count = 0
+                jd_lines.append(line)
+
+        jd_text = "\n".join(jd_lines).strip()
+
     if not jd_text:
         _print_error("❌ JD không được để trống!")
         return
 
-    _print_success(f"\n✅ Đã nhận JD: {len(jd_text)} ký tự\n")
+    _print_success(f"✅ Đã nhận JD thành công: {len(jd_text)} ký tự\n")
 
     # ── Bước 3: Khởi tạo graph ──
     thread_id = str(uuid.uuid4())
