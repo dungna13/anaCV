@@ -234,14 +234,28 @@ QUY TẮC PHÂN LOẠI KẾT LUẬN (final_verdict):
 - `CONSIDER` (overall_score từ 50 đến 69): Cân nhắc thêm, cần làm rõ một số điểm yếu ở vòng sau.
 - `FAIL` (overall_score < 50): Chưa đạt yêu cầu cho vị trí hiện tại.
 
+ĐỀ XUẤT LƯƠNG (suggested_salary):
+Dựa vào `market_salary_info` (thông tin thị trường đã cung cấp), kết quả phỏng vấn và level ứng viên,
+đề xuất mức lương cụ thể cho ứng viên này:
+- Nếu ứng viên PASS với điểm cao → đề xuất ở mức 75-90% của max thị trường.
+- Nếu CONSIDER → đề xuất ở mức avg thị trường.
+- Nếu FAIL → đề xuất mức thấp hơn avg hoặc ghi "Chưa phù hợp vị trí hiện tại".
+- Luôn kèm `rationale` giải thích lý do.
+
 OUTPUT FORMAT:
 Trả về thẻ `<thought>` phân tích trọng số, theo sau là JSON block sạch nằm trong block ```json ... ```:
 
 ```json
 {{
-  "overall_score": 75.5, // Điểm số thực từ 0.0 đến 100.0
+  "overall_score": 75.5,
   "final_verdict": "PASS | CONSIDER | FAIL",
-  "final_summary": "Tóm tắt nhận xét tổng quan 3-5 câu bằng tiếng Việt chuyên nghiệp..."
+  "final_summary": "Tóm tắt nhận xét tổng quan 3-5 câu bằng tiếng Việt chuyên nghiệp...",
+  "suggested_salary": {{
+    "min": 25000000,
+    "max": 35000000,
+    "currency": "VNĐ/tháng",
+    "rationale": "Lý do đề xuất mức lương này dựa trên kết quả phỏng vấn và thị trường..."
+  }}
 }}
 ```
 
@@ -266,6 +280,10 @@ VÍ DỤ FEW-SHOT CHẤT LƯỢNG CAO (In-Context Learning):
 - **Level:** {candidate_rank}
 - **Skill Match Score (CV vs JD):** {skill_match_score}
 - **Lĩnh vực:** {field_category}
+- **Thông tin lương thị trường:**
+```json
+{market_salary_info}
+```
 - **KẾT QUẢ PHỎNG VẤN:**
 ---
 {answer_scores_summary}
@@ -278,6 +296,7 @@ def build_final_evaluate_prompt(
     skill_match_score: float,
     field_category: str,
     answer_scores_summary: str,
+    market_salary_info: str = "{}",
 ) -> str:
     """Build prompt tổng kết đánh giá."""
     return FINAL_EVALUATE_PROMPT.format(
@@ -285,4 +304,5 @@ def build_final_evaluate_prompt(
         skill_match_score=skill_match_score,
         field_category=field_category,
         answer_scores_summary=answer_scores_summary,
+        market_salary_info=market_salary_info,
     )

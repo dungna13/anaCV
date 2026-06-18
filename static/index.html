@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CVHR — AI Agent Sơ vấn & Tối ưu CV</title>
+<style>
+  /* ─── RESET & TOKENS ─── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:        #0f1117;
+    --bg2:       #1a1d27;
+    --bg3:       #22263a;
+    --border:    #2e3250;
+    --primary:   #6c8efb;
+    --primary-d: #4a6cf7;
+    --success:   #34d399;
+    --warn:      #fbbf24;
+    --danger:    #f87171;
+    --text:      #e2e8f0;
+    --text-dim:  #7c85a2;
+    --radius:    10px;
+    --shadow:    0 4px 24px rgba(0,0,0,.4);
+    --font:      'Segoe UI', system-ui, sans-serif;
+  }
+  body { font-family: var(--font); background: var(--bg); color: var(--text);
+         min-height: 100vh; display: flex; flex-direction: column; }
+
+  /* ─── HEADER ─── */
+  header { background: var(--bg2); border-bottom: 1px solid var(--border);
+           padding: 14px 24px; display: flex; align-items: center; gap: 12px; }
+  header .logo { font-size: 22px; font-weight: 700; color: var(--primary); letter-spacing: -.5px; }
+  header .tag  { font-size: 11px; background: var(--bg3); color: var(--text-dim);
+                 border: 1px solid var(--border); border-radius: 20px; padding: 2px 10px; }
+  header .status-dot { width: 8px; height: 8px; border-radius: 50%;
+                       background: var(--text-dim); margin-left: auto; transition: background .3s; }
+  header .status-dot.online { background: var(--success); box-shadow: 0 0 8px var(--success); }
+
+  /* ─── MAIN LAYOUT ─── */
+  main { flex: 1; display: grid; grid-template-columns: 340px 1fr;
+         gap: 0; overflow: hidden; height: calc(100vh - 57px); }
+
+  /* ─── LEFT PANEL (Upload) ─── */
+  .left-panel { background: var(--bg2); border-right: 1px solid var(--border);
+                padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+  .panel-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1px;
+                 color: var(--text-dim); font-weight: 600; margin-bottom: 4px; }
+
+  /* Upload CV */
+  .upload-zone { border: 2px dashed var(--border); border-radius: var(--radius);
+                 padding: 20px; text-align: center; cursor: pointer; transition: all .2s;
+                 background: var(--bg3); position: relative; }
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--primary); background: #1e2540; }
+  .upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .upload-zone .icon { font-size: 28px; margin-bottom: 6px; }
+  .upload-zone .hint { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+  .upload-zone .filename { font-size: 12px; color: var(--success); margin-top: 6px;
+                           font-weight: 600; word-break: break-all; }
+
+  /* JD input */
+  textarea { width: 100%; background: var(--bg3); color: var(--text);
+             border: 1px solid var(--border); border-radius: var(--radius);
+             padding: 10px 12px; font-size: 13px; font-family: var(--font);
+             resize: vertical; outline: none; transition: border-color .2s; line-height: 1.5; }
+  textarea:focus { border-color: var(--primary); }
+  .jd-hint { font-size: 11px; color: var(--text-dim); margin-top: 4px; line-height: 1.6; }
+
+  /* Buttons */
+  .btn { width: 100%; padding: 11px; border-radius: var(--radius); border: none;
+         font-size: 14px; font-weight: 600; cursor: pointer; transition: all .2s; }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: var(--primary-d); transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+  .btn-reset  { background: var(--bg3); color: var(--text-dim);
+                border: 1px solid var(--border); margin-top: 6px; }
+  .btn-reset:hover { background: var(--border); color: var(--text); }
+
+  /* Result Card */
+  .result-card { background: var(--bg3); border: 1px solid var(--border);
+                 border-radius: var(--radius); padding: 14px; display: none; }
+  .result-card.show { display: block; }
+  .result-card .r-row { display: flex; justify-content: space-between; align-items: center;
+                         padding: 4px 0; font-size: 13px; }
+  .result-card .r-label { color: var(--text-dim); }
+  .result-card .r-val   { font-weight: 700; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 20px;
+           font-size: 11px; font-weight: 700; text-transform: uppercase; }
+  .badge-PASS    { background: rgba(52,211,153,.15); color: var(--success); border: 1px solid rgba(52,211,153,.3); }
+  .badge-CONSIDER{ background: rgba(251,191,36,.12); color: var(--warn); border: 1px solid rgba(251,191,36,.3); }
+  .badge-FAIL    { background: rgba(248,113,113,.12); color: var(--danger); border: 1px solid rgba(248,113,113,.3); }
+  .badge-rank    { background: rgba(108,142,251,.15); color: var(--primary); border: 1px solid rgba(108,142,251,.3); }
+
+  /* ─── RIGHT PANEL (Chat) ─── */
+  .right-panel { display: flex; flex-direction: column; overflow: hidden; }
+  .chat-area   { flex: 1; overflow-y: auto; padding: 20px; display: flex;
+                 flex-direction: column; gap: 12px; scroll-behavior: smooth; }
+
+  /* Messages */
+  .msg { display: flex; gap: 10px; max-width: 82%; animation: fadeIn .25s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; } }
+  .msg.ai   { align-self: flex-start; }
+  .msg.user { align-self: flex-end; flex-direction: row-reverse; }
+  .msg .avatar { width: 32px; height: 32px; border-radius: 50%; display: flex;
+                 align-items: center; justify-content: center; font-size: 14px;
+                 flex-shrink: 0; }
+  .msg.ai   .avatar { background: rgba(108,142,251,.2); color: var(--primary); }
+  .msg.user .avatar { background: rgba(52,211,153,.2); color: var(--success); }
+  .msg .bubble { background: var(--bg2); border: 1px solid var(--border);
+                 border-radius: 12px; padding: 10px 14px; font-size: 13.5px;
+                 line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+  .msg.user .bubble { background: var(--bg3); }
+  .msg.ai .bubble strong { color: var(--primary); }
+
+  /* Thinking indicator */
+  .thinking { display: none; align-items: center; gap: 10px; padding: 6px 0; }
+  .thinking.show { display: flex; }
+  .thinking .dots span { display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+                         background: var(--primary); animation: bounce .9s infinite;
+                         margin: 0 2px; }
+  .thinking .dots span:nth-child(2) { animation-delay: .15s; }
+  .thinking .dots span:nth-child(3) { animation-delay: .30s; }
+  @keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-6px)} }
+  .thinking .label { font-size: 12px; color: var(--text-dim); }
+
+  /* Input row */
+  .input-row { border-top: 1px solid var(--border); padding: 14px 20px;
+               display: flex; gap: 10px; background: var(--bg2);
+               align-items: flex-end; }
+  .input-row textarea { height: 44px; min-height: 44px; max-height: 120px; resize: none;
+                        padding: 11px 14px; flex: 1; }
+  .input-row .send-btn { width: 44px; height: 44px; border-radius: 50%; border: none;
+                         background: var(--primary); color: #fff; cursor: pointer;
+                         display: flex; align-items: center; justify-content: center;
+                         font-size: 18px; flex-shrink: 0; transition: all .2s; }
+  .input-row .send-btn:hover:not(:disabled) { background: var(--primary-d); transform: scale(1.08); }
+  .input-row .send-btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+  .input-row.hidden { display: none; }
+
+  /* Empty state */
+  .empty-state { display: flex; flex-direction: column; align-items: center;
+                 justify-content: center; height: 100%; color: var(--text-dim); gap: 10px; }
+  .empty-state .icon { font-size: 48px; opacity: .4; }
+  .empty-state p { font-size: 14px; text-align: center; max-width: 260px; line-height: 1.5; }
+
+  /* PDF link */
+  .pdf-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px;
+              color: var(--primary); font-size: 12px; text-decoration: none; }
+  .pdf-link:hover { text-decoration: underline; }
+
+  /* Progress bar */
+  .progress { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; margin-top: 4px; }
+  .progress-bar { height: 100%; background: var(--primary);
+                  transition: width .4s ease; border-radius: 2px; }
+
+  /* Score bar */
+  .score-bar-wrap { margin-top: 6px; }
+  .score-label { display: flex; justify-content: space-between; font-size: 11px;
+                 color: var(--text-dim); margin-bottom: 3px; }
+  .score-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .score-bar-fill { height: 100%; border-radius: 3px; transition: width .6s ease; }
+
+  /* Salary section */
+  .salary-info { margin-top: 10px; padding: 10px; background: rgba(108,142,251,.08);
+                 border: 1px solid rgba(108,142,251,.2); border-radius: 8px; }
+  .salary-info .s-title { font-size: 11px; font-weight: 700; text-transform: uppercase;
+                           letter-spacing: .5px; color: var(--primary); margin-bottom: 6px; }
+  .salary-info .s-row { font-size: 12px; display: flex; justify-content: space-between;
+                         padding: 2px 0; }
+  .salary-info .s-row .val { font-weight: 700; color: var(--success); }
+  .salary-info .rationale { font-size: 11px; color: var(--text-dim); margin-top: 6px;
+                             line-height: 1.5; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+  /* Responsive */
+  @media (max-width: 720px) {
+    main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    .left-panel { max-height: 45vh; border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⚡ CVHR</div>
+  <div class="tag">AI Interview Agent</div>
+  <div class="status-dot" id="statusDot"></div>
+</header>
+
+<main>
+  <!-- LEFT: Upload + Results -->
+  <div class="left-panel">
+    <div>
+      <div class="panel-title">📄 File CV</div>
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="cvFile" accept=".pdf,.txt,.md" />
+        <div class="icon">📎</div>
+        <div>Kéo thả hoặc click để chọn file</div>
+        <div class="hint">Hỗ trợ PDF, TXT, MD</div>
+        <div class="filename" id="fileName"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel-title">📋 Job Description (tùy chọn)</div>
+      <textarea id="jdInput" rows="5"
+        placeholder="Paste JD trực tiếp, nhập URL tuyển dụng, hoặc nhập chức danh (vd: Python Developer)&#10;&#10;Để trống → AI tự tạo JD từ CV"></textarea>
+      <div class="jd-hint">
+        ✦ URL: hệ thống tự cào&nbsp;&nbsp;
+        ✦ Keywords: tự tìm kiếm&nbsp;&nbsp;
+        ✦ Trống: AI tự sinh từ CV
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="startBtn" onclick="startSession()">
+      🚀 Bắt đầu phỏng vấn
+    </button>
+    <button class="btn btn-reset" id="resetBtn" onclick="resetSession()" style="display:none">
+      🔄 Phiên mới
+    </button>
+
+    <!-- Session info -->
+    <div id="sessionInfo" style="display:none">
+      <div class="panel-title">🆔 Phiên</div>
+      <div id="sessionId" style="font-size:11px;color:var(--text-dim);word-break:break-all;font-family:monospace"></div>
+    </div>
+
+    <!-- Result card -->
+    <div class="result-card" id="resultCard">
+      <div class="panel-title" style="margin-bottom:10px">📊 Kết quả đánh giá</div>
+
+      <div class="r-row">
+        <span class="r-label">Kết luận</span>
+        <span class="r-val" id="rVerdict"></span>
+      </div>
+      <div class="r-row">
+        <span class="r-label">Level</span>
+        <span class="r-val" id="rRank"></span>
+      </div>
+
+      <div class="score-bar-wrap">
+        <div class="score-label">
+          <span>Điểm tổng</span>
+          <span id="rScore">0/100</span>
+        </div>
+        <div class="score-bar">
+          <div class="score-bar-fill" id="rScoreBar" style="width:0%;background:var(--primary)"></div>
+        </div>
+      </div>
+
+      <div class="salary-info" id="salaryInfo" style="display:none">
+        <div class="s-title">💰 Đề xuất lương</div>
+        <div class="s-row"><span>Thị trường</span><span class="val" id="sMarket">—</span></div>
+        <div class="s-row"><span>Đề xuất cá nhân</span><span class="val" id="sSuggest">—</span></div>
+        <div class="rationale" id="sRationale"></div>
+      </div>
+
+      <div id="pdfLink"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Chat -->
+  <div class="right-panel">
+    <div class="chat-area" id="chatArea">
+      <div class="empty-state" id="emptyState">
+        <div class="icon">🤖</div>
+        <p>Upload CV và nhấn <strong>Bắt đầu phỏng vấn</strong> để bắt đầu buổi sơ vấn AI</p>
+      </div>
+    </div>
+
+    <div class="thinking" id="thinking">
+      <div class="dots">
+        <span></span><span></span><span></span>
+      </div>
+      <div class="label">AI đang xử lý...</div>
+    </div>
+
+    <div class="input-row hidden" id="inputRow">
+      <textarea id="answerInput" placeholder="Nhập câu trả lời..."
+        onkeydown="handleKey(event)"></textarea>
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()" title="Gửi (Enter)">➤</button>
+    </div>
+  </div>
+</main>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────
+let sessionId   = null;
+let isWaiting   = false;   // đang chờ user input
+let isStreaming = false;
+const API_BASE  = '';      // same origin
+
+// ─────────────────────────────────────────────────────────────
+// UPLOAD ZONE
+// ─────────────────────────────────────────────────────────────
+const zone = document.getElementById('uploadZone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+zone.addEventListener('drop', e => {
+  e.preventDefault();
+  zone.classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f) setFile(f);
+});
+document.getElementById('cvFile').addEventListener('change', e => {
+  if (e.target.files[0]) setFile(e.target.files[0]);
+});
+function setFile(f) {
+  document.getElementById('fileName').textContent = '✅ ' + f.name;
+  document.getElementById('cvFile').files = (function(file) {
+    const dt = new DataTransfer(); dt.items.add(file); return dt.files;
+  })(f);
+}
+
+// ─────────────────────────────────────────────────────────────
+// AUTO-RESIZE TEXTAREA
+// ─────────────────────────────────────────────────────────────
+const answerTextarea = document.getElementById('answerInput');
+answerTextarea.addEventListener('input', () => {
+  answerTextarea.style.height = '44px';
+  answerTextarea.style.height = Math.min(answerTextarea.scrollHeight, 120) + 'px';
+});
+
+// ─────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────
+function setStatus(online) {
+  document.getElementById('statusDot').classList.toggle('online', online);
+}
+
+function showThinking(show) {
+  document.getElementById('thinking').classList.toggle('show', show);
+}
+
+function setInputEnabled(enabled) {
+  const row = document.getElementById('inputRow');
+  const btn = document.getElementById('sendBtn');
+  const ta  = document.getElementById('answerInput');
+  row.classList.toggle('hidden', !enabled);
+  btn.disabled = !enabled;
+  ta.disabled  = !enabled;
+  if (enabled) { ta.focus(); }
+}
+
+function scrollChat() {
+  const area = document.getElementById('chatArea');
+  area.scrollTop = area.scrollHeight;
+}
+
+function clearEmpty() {
+  const e = document.getElementById('emptyState');
+  if (e) e.remove();
+}
+
+function appendMsg(type, text) {
+  clearEmpty();
+  const div = document.createElement('div');
+  div.className = `msg ${type}`;
+
+  const avatar = document.createElement('div');
+  avatar.className = 'avatar';
+  avatar.textContent = type === 'ai' ? '🤖' : '👤';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.innerHTML = formatText(text);
+
+  div.appendChild(avatar);
+  div.appendChild(bubble);
+  document.getElementById('chatArea').appendChild(div);
+  scrollChat();
+}
+
+function formatText(text) {
+  // Bold **text** và escape HTML
+  return text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`(.+?)`/g, '<code style="background:var(--bg3);padding:1px 5px;border-radius:4px">$1</code>');
+}
+
+// ─────────────────────────────────────────────────────────────
+// SSE READER (fetch-based, hỗ trợ POST)
+// ─────────────────────────────────────────────────────────────
+async function readSSE(response, onEvent) {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop(); // giữ lại dòng chưa hoàn chỉnh
+
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = line.slice(6).trim();
+        if (data === '[DONE]' || !data) continue;
+        try {
+          onEvent(JSON.parse(data));
+        } catch { /* bỏ qua parse lỗi */ }
+      }
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// HANDLE SSE EVENT
+// ─────────────────────────────────────────────────────────────
+function handleEvent(evt) {
+  showThinking(false);
+
+  switch (evt.type) {
+    case 'session_start':
+      sessionId = evt.session_id;
+      document.getElementById('sessionId').textContent = sessionId;
+      document.getElementById('sessionInfo').style.display = 'block';
+      showThinking(true);
+      break;
+
+    case 'message':
+      appendMsg('ai', evt.content);
+      showThinking(true); // tiếp tục thinking cho đến khi interrupt/done
+      break;
+
+    case 'interrupt':
+      showThinking(false);
+      appendMsg('ai', evt.content);
+      isWaiting = true;
+      isStreaming = false;
+      setInputEnabled(true);
+      break;
+
+    case 'done':
+      showThinking(false);
+      isStreaming = false;
+      isWaiting   = false;
+      setInputEnabled(false);
+      showResultCard(evt.state);
+      setStatus(false);
+      document.getElementById('resetBtn').style.display = 'block';
+      break;
+
+    case 'error':
+      showThinking(false);
+      appendMsg('ai', '❌ Lỗi hệ thống: ' + evt.detail);
+      isStreaming = false;
+      setInputEnabled(false);
+      break;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// RESULT CARD
+// ─────────────────────────────────────────────────────────────
+function showResultCard(state) {
+  const card = document.getElementById('resultCard');
+  card.classList.add('show');
+
+  const verdict = state.final_verdict || 'N/A';
+  document.getElementById('rVerdict').innerHTML =
+    `<span class="badge badge-${verdict}">${verdict}</span>`;
+
+  const rank = state.candidate_rank || 'N/A';
+  document.getElementById('rRank').innerHTML =
+    `<span class="badge badge-rank">${rank.toUpperCase()}</span>`;
+
+  const score = Math.round(state.overall_score || 0);
+  document.getElementById('rScore').textContent = score + '/100';
+  const bar = document.getElementById('rScoreBar');
+  bar.style.width = score + '%';
+  bar.style.background = score >= 70 ? 'var(--success)' : score >= 50 ? 'var(--warn)' : 'var(--danger)';
+
+  // Salary
+  const sal = state.suggested_salary;
+  if (sal && sal.min && sal.max) {
+    document.getElementById('salaryInfo').style.display = 'block';
+    const minM = Math.round(sal.min / 1_000_000);
+    const maxM = Math.round(sal.max / 1_000_000);
+    document.getElementById('sSuggest').textContent = `${minM}M – ${maxM}M VNĐ/tháng`;
+    if (sal.rationale) {
+      document.getElementById('sRationale').textContent = sal.rationale;
+    }
+  }
+
+  // PDF
+  if (state.pdf_path) {
+    document.getElementById('pdfLink').innerHTML =
+      `<a class="pdf-link" href="/api/download?path=${encodeURIComponent(state.pdf_path)}" target="_blank">
+        📄 Tải báo cáo PDF
+      </a>`;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// START SESSION
+// ─────────────────────────────────────────────────────────────
+async function startSession() {
+  const fileInput = document.getElementById('cvFile');
+  if (!fileInput.files.length) {
+    alert('Vui lòng chọn file CV!');
+    return;
+  }
+
+  const jdText = document.getElementById('jdInput').value.trim();
+
+  // Reset UI
+  document.getElementById('chatArea').innerHTML = '';
+  document.getElementById('resultCard').classList.remove('show');
+  document.getElementById('salaryInfo').style.display = 'none';
+  document.getElementById('pdfLink').innerHTML = '';
+  document.getElementById('startBtn').disabled = true;
+  document.getElementById('resetBtn').style.display = 'none';
+  setInputEnabled(false);
+  setStatus(true);
+  showThinking(true);
+  isStreaming = true;
+  isWaiting   = false;
+
+  const fd = new FormData();
+  fd.append('cv_file', fileInput.files[0]);
+  fd.append('jd_text', jdText);
+
+  try {
+    const resp = await fetch(`${API_BASE}/api/session/start`, {
+      method: 'POST',
+      body: fd,
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+      appendMsg('ai', '❌ ' + (err.detail || 'Lỗi kết nối API'));
+      showThinking(false);
+      document.getElementById('startBtn').disabled = false;
+      setStatus(false);
+      return;
+    }
+
+    // Lấy session_id từ header (nếu có) hoặc từ event done
+    sessionId = resp.headers.get('X-Session-Id') || null;
+
+    await readSSE(resp, evt => {
+      // Nếu event done trả về session_id
+      if (evt.type === 'done' && evt.state?.session_id) {
+        sessionId = evt.state.session_id;
+        document.getElementById('sessionId').textContent = sessionId;
+        document.getElementById('sessionInfo').style.display = 'block';
+      }
+      handleEvent(evt);
+    });
+
+  } catch (e) {
+    appendMsg('ai', '❌ Lỗi kết nối: ' + e.message);
+    showThinking(false);
+    document.getElementById('startBtn').disabled = false;
+    setStatus(false);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// SEND MESSAGE (resume interrupt)
+// ─────────────────────────────────────────────────────────────
+async function sendMessage() {
+  if (!isWaiting || !sessionId) return;
+
+  const ta = document.getElementById('answerInput');
+  const msg = ta.value.trim();
+  if (!msg) return;
+
+  appendMsg('user', msg);
+  ta.value = '';
+  ta.style.height = '44px';
+
+  isWaiting = false;
+  setInputEnabled(false);
+  showThinking(true);
+
+  try {
+    const resp = await fetch(`${API_BASE}/api/session/message`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId, message: msg }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+      appendMsg('ai', '❌ ' + (err.detail || 'Lỗi API'));
+      showThinking(false);
+      return;
+    }
+
+    await readSSE(resp, handleEvent);
+
+  } catch (e) {
+    appendMsg('ai', '❌ Lỗi kết nối: ' + e.message);
+    showThinking(false);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// KEY HANDLER
+// ─────────────────────────────────────────────────────────────
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// RESET
+// ─────────────────────────────────────────────────────────────
+function resetSession() {
+  sessionId   = null;
+  isWaiting   = false;
+  isStreaming  = false;
+
+  document.getElementById('chatArea').innerHTML =
+    `<div class="empty-state" id="emptyState">
+      <div class="icon">🤖</div>
+      <p>Upload CV và nhấn <strong>Bắt đầu phỏng vấn</strong> để bắt đầu buổi sơ vấn AI</p>
+    </div>`;
+  document.getElementById('resultCard').classList.remove('show');
+  document.getElementById('salaryInfo').style.display = 'none';
+  document.getElementById('pdfLink').innerHTML = '';
+  document.getElementById('sessionInfo').style.display = 'none';
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('resetBtn').style.display = 'none';
+  document.getElementById('fileName').textContent = '';
+  document.getElementById('cvFile').value = '';
+  document.getElementById('jdInput').value = '';
+  setInputEnabled(false);
+  showThinking(false);
+  setStatus(false);
+}
+</script>
+</body>
+</html>

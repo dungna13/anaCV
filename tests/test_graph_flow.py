@@ -108,9 +108,39 @@ def test_graph_compile():
     """Kiểm tra đồ thị LangGraph build và compile thành công."""
     graph = build_graph()
     assert graph is not None
-    # Kiểm tra các node cốt lõi đã được add vào graph
     node_names = graph.nodes.keys()
     assert "parse_cv" in node_names
+    assert "enrich_jd" in node_names
     assert "analyze_cv" in node_names
     assert "rank_candidate" in node_names
     assert "human" in node_names
+    assert "final_evaluate" in node_names
+    assert "cv_improve_subagent" in node_names
+    assert "generate_pdf" in node_names
+
+
+def test_extract_json_raw_object():
+    """Kiểm tra trích JSON khi không có code fence."""
+    response = '{"score": 8, "feedback": "Tốt"}'
+    data = _extract_json(response)
+    assert data["score"] == 8
+
+
+def test_extract_json_array():
+    """Kiểm tra trích JSON array."""
+    response = '```json\n[{"q": "Câu 1"}, {"q": "Câu 2"}]\n```'
+    data = _extract_json(response)
+    assert isinstance(data, list)
+    assert len(data) == 2
+
+
+def test_validate_answer_none():
+    is_valid, reason = _validate_answer(None)
+    assert is_valid is False
+    assert reason == "trống"
+
+
+def test_validate_answer_repeat_chars():
+    """Chuỗi lặp ký tự bị coi là spam."""
+    is_valid, _ = _validate_answer("aaaaaaaaaaaa")
+    assert is_valid is False

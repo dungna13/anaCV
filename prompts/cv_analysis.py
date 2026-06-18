@@ -9,6 +9,67 @@ Chứa 2 prompt:
 from datetime import date
 
 # ─────────────────────────────────────────────────────────────
+# PROMPT 0a: Trích xuất Job Title từ JD text
+# ─────────────────────────────────────────────────────────────
+
+EXTRACT_JOB_TITLE_PROMPT = """
+Bạn là chuyên gia phân tích tin tuyển dụng. Nhiệm vụ: đọc nội dung JD (Job Description) và trích xuất chức danh công việc chính xác nhất.
+
+QUY TẮC:
+1. Trích xuất chính xác chức danh (job title) từ JD — đây thường là dòng đầu, tiêu đề, hoặc được ghi rõ "Vị trí: ...", "Position: ...", "Chức danh: ...".
+2. Nếu JD ghi nhiều vị trí, chọn vị trí chính (primary).
+3. Nếu không tìm thấy chức danh rõ ràng, suy luận từ yêu cầu kỹ năng và mô tả công việc.
+4. Chỉ trả về JSON, không thêm văn bản khác.
+
+OUTPUT FORMAT:
+```json
+{{
+  "job_title": "Backend Developer Python",
+  "field_hint": "it | marketing | finance | design | other"
+}}
+```
+
+## NỘI DUNG JD:
+---
+{jd_text}
+---
+""".strip()
+
+
+def build_extract_job_title_prompt(jd_text: str) -> str:
+    return EXTRACT_JOB_TITLE_PROMPT.format(jd_text=jd_text)
+
+
+# ─────────────────────────────────────────────────────────────
+# PROMPT 0b: Sinh JD giả từ CV khi không có JD
+# ─────────────────────────────────────────────────────────────
+
+EXPAND_JD_PROMPT = """
+Bạn là chuyên gia nhân sự. Dựa vào CV đã cấu trúc bên dưới, hãy:
+1. Xác định vị trí công việc phù hợp nhất mà ứng viên này đang hướng tới (hoặc đang làm).
+2. Sinh một JD ngắn gọn (~200 từ) phù hợp với background của ứng viên, bao gồm: yêu cầu kỹ năng, kinh nghiệm, trình độ học vấn.
+
+Mục đích: Tạo JD tham chiếu để hệ thống phân tích CV và sinh câu hỏi phỏng vấn phù hợp khi người dùng không cung cấp JD.
+
+OUTPUT FORMAT:
+```json
+{{
+  "job_title": "Chức danh suy luận (String)",
+  "synthetic_jd": "Nội dung JD được sinh ra (String, ~200 từ)"
+}}
+```
+
+## CV ĐÃ CẤU TRÚC:
+```json
+{cv_structured}
+```
+""".strip()
+
+
+def build_expand_jd_prompt(cv_structured: str) -> str:
+    return EXPAND_JD_PROMPT.format(cv_structured=cv_structured)
+
+# ─────────────────────────────────────────────────────────────
 # PROMPT 1: Parse CV raw text → structured JSON
 # ─────────────────────────────────────────────────────────────
 

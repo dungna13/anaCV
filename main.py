@@ -130,9 +130,13 @@ def run_terminal() -> None:
         _print_error(f"❌ Lỗi không mong muốn khi đọc CV: {e}")
         return
 
-    # ── Bước 2: Nhập JD ──
-    print("📋 Nhập Job Description (JD):")
-    print("   (Bạn có thể dán trực tiếp nội dung JD, hoặc kéo thả/nhập đường dẫn file PDF/TXT và nhấn Enter)")
+    # ── Bước 2: Nhập JD (tùy chọn) ──
+    print("📋 Nhập Job Description (JD) — có thể để trống:")
+    print("   1. Paste nội dung JD trực tiếp")
+    print("   2. Nhập URL tuyển dụng (TopCV, ITViec, LinkedIn...)")
+    print("   3. Nhập chức danh/keywords (vd: 'Python Developer')")
+    print("   4. Để trống → AI tự trích từ CV và tạo JD phù hợp")
+    print("   [Nhấn Enter 2 lần để kết thúc nhập]")
     print("-" * 75)
 
     first_line = input().strip().strip('"')
@@ -170,10 +174,9 @@ def run_terminal() -> None:
         jd_text = "\n".join(jd_lines).strip()
 
     if not jd_text:
-        _print_error("❌ JD không được để trống!")
-        return
-
-    _print_success(f"✅ Đã nhận JD thành công: {len(jd_text)} ký tự\n")
+        _print_warning("⚠️ Không có JD — AI sẽ tự trích từ CV để phân tích.\n")
+    else:
+        _print_success(f"✅ Đã nhận JD thành công: {len(jd_text)} ký tự\n")
 
     # ── Bước 3: Khởi tạo graph ──
     thread_id = str(uuid.uuid4())
@@ -240,14 +243,30 @@ def run_terminal() -> None:
             print(f"   - Level: {rank.upper()}")
             print(f"   - Điểm tổng: {score}/100")
             print(f"   - Kết luận: {color}{_C.BOLD}{verdict}{_C.RESET}")
+            suggested = result.get("suggested_salary") or {}
+            if suggested.get("min") and suggested.get("max"):
+                try:
+                    s_min = int(suggested["min"]) // 1_000_000
+                    s_max = int(suggested["max"]) // 1_000_000
+                    print(f"   - Đề xuất lương: {_C.GREEN}{s_min}M – {s_max}M VNĐ/tháng{_C.RESET}")
+                except Exception:
+                    pass
 
         return
 
 
 if __name__ == "__main__":
     if "--api" in sys.argv:
-        # Phase 4: Start FastAPI server
-        print("API mode chưa được triển khai (Phase 4).")
-        print("Sử dụng: python main.py  (terminal mode)")
+        import uvicorn
+        from config.settings import get_settings
+        s = get_settings()
+        print(f"🚀 Khởi động CVHR API server tại http://{s.api.host}:{s.api.port}")
+        print(f"   Docs: http://{s.api.host}:{s.api.port}/docs")
+        uvicorn.run(
+            "services.api:app",
+            host=s.api.host,
+            port=s.api.port,
+            reload=s.api.debug,
+        )
     else:
         run_terminal()

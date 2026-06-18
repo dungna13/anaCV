@@ -36,7 +36,12 @@ from langgraph.types import interrupt
 from typing_extensions import TypedDict
 
 from config.settings import get_settings
-from prompts.cv_analysis import build_analyze_cv_prompt, build_parse_cv_prompt
+from prompts.cv_analysis import (
+    build_analyze_cv_prompt,
+    build_expand_jd_prompt,
+    build_extract_job_title_prompt,
+    build_parse_cv_prompt,
+)
 from prompts.interview import (
     build_evaluate_answer_prompt,
     build_final_evaluate_prompt,
@@ -44,6 +49,7 @@ from prompts.interview import (
 )
 from prompts.cv_improvement import build_cv_improvement_prompt
 from prompts.ranking import build_ranking_prompt
+from services.tools.tool_api import scrape_jd_from_url, search_job_market, search_web_for_jd
 
 
 settings = get_settings()
@@ -327,6 +333,14 @@ class CVHRState(TypedDict, total=False):
     pdf_generated: bool
     pdf_path: str                 # Đường dẫn file PDF output
 
+    # ─── Phase 3.5: JD Enrichment ───
+    job_title: str               # Chức danh trích từ JD/CV
+    jd_source: str               # "user_text" | "url_scraped" | "web_search" | "llm_generated"
+
+    # ─── Phase 3.5: Salary Data ───
+    market_salary_info: dict     # Từ search_job_market
+    suggested_salary: dict       # {min, max, currency, rationale}
+
 
 # ─────────────────────────────────────────────────────────────
 # NODES
@@ -396,6 +410,109 @@ def node_parse_cv(state: CVHRState) -> dict:
         "parse_done": True,
         "field_category": detected_field,
         "messages": [AIMessage(content=summary_msg)],
+    }
+
+
+def node_enrich_jd(state: CVHRState) -> dict:
+    """Node 1.5: Giải quyết nguồn JD từ bất kỳ dạng input nào.
+
+    Case A: jd_text là URL → scrape, fallback LLM expand.
+    Case B: jd_text ngắn < 200 ký tự (keywords) → search_web → scrape → fallback LLM.
+    Case C: jd_text rỗng → trích job_title từ CV → tương tự Case B.
+    """
+    llm = _get_llm()
+    jd_text = (state.get("jd_text") or "").strip()
+    cv_structured = state.get("cv_structured") or {}
+
+    job_title = ""
+    jd_source = "user_text"
+    enriched_jd = jd_text
+
+    # ── Case A: URL ──
+    if jd_text.startswith(("http://", "https://")):
+        scraped = scrape_jd_from_url.invoke({"url": jd_text})
+        if not scraped.startswith("❌") and not scraped.startswith("⚠️") and len(scraped) >= 150:
+            enriched_jd = scraped
+            jd_source = "url_scraped"
+        else:
+            # Fallback: LLM expand từ URL domain
+            prompt = build_expand_jd_prompt(json.dumps(cv_structured, ensure_ascii=False))
+            result = _safe_llm_json_call(
+                llm, prompt,
+                required_keys=["job_title", "synthetic_jd"],
+                default_factory=lambda: {"job_title": "", "synthetic_jd": jd_text},
+                label="enrich_jd_url_fallback",
+            )
+            enriched_jd = result.get("synthetic_jd") or jd_text
+            job_title = result.get("job_title") or ""
+            jd_source = "llm_generated"
+
+    # ── Case B: keywords (ngắn, không phải URL) ──
+    elif jd_text and len(jd_text) < 200:
+        keywords = jd_text
+        urls = search_web_for_jd(keywords, max_results=3)
+        scraped_ok = False
+        for url in urls:
+            scraped = scrape_jd_from_url.invoke({"url": url})
+            if not scraped.startswith("❌") and not scraped.startswith("⚠️") and len(scraped) >= 150:
+                enriched_jd = scraped
+                jd_source = "web_search"
+                scraped_ok = True
+                break
+        if not scraped_ok:
+            prompt = build_expand_jd_prompt(json.dumps(cv_structured, ensure_ascii=False))
+            result = _safe_llm_json_call(
+                llm, prompt,
+                required_keys=["job_title", "synthetic_jd"],
+                default_factory=lambda: {"job_title": keywords, "synthetic_jd": jd_text},
+                label="enrich_jd_keyword_fallback",
+            )
+            enriched_jd = result.get("synthetic_jd") or jd_text
+            job_title = result.get("job_title") or keywords
+            jd_source = "llm_generated"
+
+    # ── Case C: rỗng → tự trích từ CV ──
+    elif not jd_text:
+        prompt = build_expand_jd_prompt(json.dumps(cv_structured, ensure_ascii=False))
+        result = _safe_llm_json_call(
+            llm, prompt,
+            required_keys=["job_title", "synthetic_jd"],
+            default_factory=lambda: {"job_title": "Chưa xác định", "synthetic_jd": ""},
+            label="enrich_jd_from_cv",
+        )
+        enriched_jd = result.get("synthetic_jd") or ""
+        job_title = result.get("job_title") or ""
+        jd_source = "llm_generated"
+
+    # Nếu có JD text đầy đủ (Case A user_text) → trích job_title từ JD
+    if jd_source == "user_text" and enriched_jd:
+        prompt = build_extract_job_title_prompt(enriched_jd[:3000])
+        result = _safe_llm_json_call(
+            llm, prompt,
+            required_keys=["job_title"],
+            default_factory=lambda: {"job_title": ""},
+            label="extract_job_title",
+        )
+        job_title = result.get("job_title") or ""
+
+    source_label = {
+        "user_text": "nhập thủ công",
+        "url_scraped": "cào từ URL",
+        "web_search": "tìm kiếm web",
+        "llm_generated": "AI tự sinh từ CV",
+    }.get(jd_source, jd_source)
+
+    msg = (
+        f"📋 **JD đã sẵn sàng** (nguồn: {source_label})\n"
+        f"- Chức danh: {job_title or 'N/A'}\n"
+        f"- Độ dài JD: {len(enriched_jd)} ký tự"
+    )
+
+    return {
+        "jd_text": enriched_jd,
+        "job_title": job_title,
+        "jd_source": jd_source,
+        "messages": [AIMessage(content=msg)],
     }
 
 
@@ -507,11 +624,27 @@ def node_rank_candidate(state: CVHRState) -> dict:
         f"- Lý do: {reasoning}"
     )
 
+    # Lấy market salary data
+    job_title = state.get("job_title") or ""
+    try:
+        market_json = search_job_market.invoke({
+            "job_title": job_title or rank,
+            "candidate_rank": rank,
+            "field_category": field,
+        })
+        market_salary_info = json.loads(market_json)
+        salary_display = market_salary_info.get("salary_display", "N/A")
+        summary_msg += f"\n- Lương thị trường: {salary_display}"
+    except Exception as e:
+        print(f"[CVHR] ⚠️ [rank_candidate] search_job_market lỗi: {e}")
+        market_salary_info = {}
+
     return {
         "candidate_rank": rank,
         "rank_reasoning": reasoning,
         "years_of_experience": years,
         "field_category": field,
+        "market_salary_info": market_salary_info,
         "messages": [AIMessage(content=summary_msg)],
     }
 
@@ -728,11 +861,14 @@ def node_final_evaluate(state: CVHRState) -> dict:
         for s in answer_scores
     ]) or "(Không có câu trả lời nào được ghi nhận.)"
 
+    market_salary_info = state.get("market_salary_info") or {}
+
     prompt = build_final_evaluate_prompt(
         candidate_rank=state["candidate_rank"],
         skill_match_score=skill_match_score,
         field_category=state["field_category"],
         answer_scores_summary=scores_summary,
+        market_salary_info=json.dumps(market_salary_info, ensure_ascii=False),
     )
 
     def _default_final_evaluate() -> dict:
@@ -771,20 +907,30 @@ def node_final_evaluate(state: CVHRState) -> dict:
 
     verdict = result.get("final_verdict", "CONSIDER")
     if verdict not in VALID_VERDICTS:
-        # Tự soát lỗi (Layer 5): verdict ngoài enum → suy ra lại từ overall_score.
         verdict = "PASS" if overall_score >= 70 else "CONSIDER" if overall_score >= 50 else "FAIL"
 
     final_summary = result.get("final_summary") or "Không có nhận xét tổng kết."
+    suggested_salary = result.get("suggested_salary") or {}
 
     verdict_emoji = {"PASS": "✅", "CONSIDER": "🤔", "FAIL": "❌"}
     emoji = verdict_emoji.get(verdict, "📋")
+
+    salary_line = ""
+    if suggested_salary and suggested_salary.get("min"):
+        try:
+            s_min = int(suggested_salary["min"]) // 1_000_000
+            s_max = int(suggested_salary["max"]) // 1_000_000
+            salary_line = f"\n- **Đề xuất lương:** {s_min}M – {s_max}M VNĐ/tháng"
+        except Exception:
+            pass
 
     summary_msg = (
         f"\n{'='*50}\n"
         f"{emoji} **KẾT QUẢ ĐÁNH GIÁ TỔNG KẾT**\n"
         f"{'='*50}\n\n"
         f"- **Điểm tổng:** {overall_score}/100\n"
-        f"- **Kết luận:** {verdict}\n\n"
+        f"- **Kết luận:** {verdict}"
+        f"{salary_line}\n\n"
         f"**Nhận xét:**\n{final_summary}"
     )
 
@@ -792,6 +938,7 @@ def node_final_evaluate(state: CVHRState) -> dict:
         "overall_score": overall_score,
         "final_verdict": verdict,
         "final_summary": final_summary,
+        "suggested_salary": suggested_salary,
         "messages": [AIMessage(content=summary_msg)],
     }
 
@@ -840,24 +987,35 @@ def node_cv_improve_subagent(state: CVHRState) -> dict:
 
 
 def node_generate_pdf(state: CVHRState) -> dict:
-    """Node 10: Sinh file PDF Evaluation Report.
+    """Node 10: Sinh file PDF Evaluation Report bằng reportlab."""
+    from services.tools.pdf_generator import generate_evaluation_pdf
 
-    Phase 2: Chỉ log thông báo (chưa generate PDF thực tế).
-    Phase 3: Tích hợp services/tools/pdf_generator.py (reportlab).
-    """
-    # TODO Phase 3: Tích hợp pdf_generator.py
     name = (state.get("cv_structured") or {}).get("name") or "ứng viên"
-    summary_msg = (
-        f"\n🎉 **Hoàn tất đánh giá cho {name}!**\n\n"
-        f"📄 Báo cáo PDF sẽ được sinh trong Phase 3.\n"
-        f"Cảm ơn bạn đã tham gia sơ vấn!"
-    )
 
-    return {
-        "pdf_generated": False,  # Will be True in Phase 3
-        "pdf_path": "",
-        "messages": [AIMessage(content=summary_msg)],
-    }
+    try:
+        pdf_path = generate_evaluation_pdf(dict(state), output_dir="data/reports")
+        summary_msg = (
+            f"\n🎉 **Hoàn tất đánh giá cho {name}!**\n\n"
+            f"📄 Báo cáo PDF đã được xuất:\n`{pdf_path}`\n\n"
+            f"Cảm ơn bạn đã tham gia sơ vấn!"
+        )
+        return {
+            "pdf_generated": True,
+            "pdf_path": pdf_path,
+            "messages": [AIMessage(content=summary_msg)],
+        }
+    except Exception as e:
+        print(f"[CVHR] ⚠️ [generate_pdf] Lỗi sinh PDF: {e}")
+        summary_msg = (
+            f"\n🎉 **Hoàn tất đánh giá cho {name}!**\n\n"
+            f"⚠️ Không thể sinh file PDF tự động: {e}\n"
+            f"Cảm ơn bạn đã tham gia sơ vấn!"
+        )
+        return {
+            "pdf_generated": False,
+            "pdf_path": "",
+            "messages": [AIMessage(content=summary_msg)],
+        }
 
 
 # ─────────────────────────────────────────────────────────────
@@ -918,6 +1076,7 @@ def build_graph(checkpointer=None):
 
     # ── Đăng ký Nodes ──
     builder.add_node("parse_cv", node_parse_cv)
+    builder.add_node("enrich_jd", node_enrich_jd)
     builder.add_node("analyze_cv", node_analyze_cv)
     builder.add_node("rank_candidate", node_rank_candidate)
     builder.add_node("generate_questions", node_generate_questions)
@@ -930,7 +1089,8 @@ def build_graph(checkpointer=None):
 
     # ── Normal Edges (đường thẳng, không điều kiện) ──
     builder.add_edge(START, "parse_cv")
-    builder.add_edge("parse_cv", "analyze_cv")
+    builder.add_edge("parse_cv", "enrich_jd")
+    builder.add_edge("enrich_jd", "analyze_cv")
     builder.add_edge("analyze_cv", "rank_candidate")
     builder.add_edge("rank_candidate", "generate_questions")
     builder.add_edge("generate_questions", "ask_question")
